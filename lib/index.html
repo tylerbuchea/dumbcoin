@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      h2 {
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+  
+    <div id="app"></div>
+  
+    <script>
+      const $app = document.getElementById("app");
+      const headers = { 'Content-Type': 'application/json' };
+
+      const endpoints = [
+        // read
+        { method: "get", path: "/blockchain/transactions", title: "Transactions", active: true },
+        { method: "get", path: "/blockchain/transactions/unspent", title: "Unspent", active: true },
+        { method: "get", path: "/operator/wallets", title: "Wallets", active: true },
+        { method: "get", path: "/node/peers", title: "Peers", active: true },
+        { method: "get", path: "/blockchain/blocks/latest", title: "Latest Block", active: true },
+        { method: "get", path: "/blockchain/blocks", title: "Blocks", active: true },
+        { method: "get", path: "/blockchain/blocks/:hash([a-zA-Z0-9]{64})" },
+        { method: "get", path: "/blockchain/blocks/:index" },
+        { method: "get", path: "/blockchain/blocks/transactions/:transactionId([a-zA-Z0-9]{64})" },
+        { method: "get", path: "/operator/wallets/:walletId" },
+        { method: "get", path: "/operator/wallets/:walletId/addresses" },
+        { method: "get", path: "/operator/:addressId/balance" },
+        { method: "get", path: "/node/transactions/:transactionId([a-zA-Z0-9]{64})/confirmations" },
+        // write
+        { method: "put", path: "/blockchain/blocks/latest" },
+        { method: "post", path: "/blockchain/transactions" },
+        { method: "post", path: "/operator/wallets" },
+        { method: "post", path: "/operator/wallets/:walletId/transactions" },
+        { method: "post", path: "/operator/wallets/:walletId/addresses" },
+        { method: "post", path: "/node/peers" },
+        { method: "post", path: "/miner/mine" },
+      ]
+
+      function toggleClosed(index, closed) {
+        endpoints[index].closed = !closed;
+        update();
+      }
+      
+      const password = "t t t t t";
+      let walletId = null;
+      let addressId = null;
+
+      function createWallet() {
+        const body = JSON.stringify({ password })
+        fetch("/operator/wallets", { method: "post", body, headers })
+          .then(r => r.json())
+          .then(d => {
+            walletId = d.id;
+            console.log(d);
+            return;
+          })
+          .then(update)
+      }
+
+      function createAddress() {
+        fetch(`/operator/wallets/${walletId}/addresses`, { method: "post", headers: { password } })
+          .then(r => r.json())
+          .then(d => {
+            addressId = d.address;
+            console.log(d);
+            return;
+          })
+          .then(update)
+      }
+
+      function startMiner() {
+        const body = JSON.stringify({ rewardAddress: addressId })
+        fetch("/miner/mine", { method: "post", body, headers })
+          .then(r => r.json())
+          .then(console.log)
+          .then(update)
+      }
+
+      function getBalance() {
+        const body = JSON.stringify({ rewardAddress: addressId })
+        fetch(`/operator/${addressId}/balance`, { method: "get" })
+          .then(r => r.json())
+          .then(console.log)
+          .then(update)
+      }
+
+      update();
+      function update() {
+        $app.innerHTML = `
+          <h1>Dumbcoin</h1>
+          <button onclick="update()">Update</button>
+          <button onclick="createWallet()">Create Wallet</button>
+          <button onclick="createAddress()">Create Address</button>
+          <button onclick="startMiner()">Start Miner</button>
+          <button onclick="getBalance()">Get Balance</button>
+        `;
+        endpoints.forEach((entry, index) => {
+          if (entry.active) {
+            const { path, method } = entry;
+            fetch(path, { method }).then(r => r.json()).then(data => render(data, index))
+          };
+        })
+      }
+
+
+      function render(data, index) {
+        const { closed, title } = endpoints[index];
+        $app.innerHTML += `
+          <h2 onclick="toggleClosed(${index}, ${closed})">
+            ${title} <small>${closed ? " ▼" : " ▲"}</small>
+          </h2>
+        `;
+        if (!closed) {
+          $app.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`
+        }
+      };
+    </script>
+  </body>
+</html>
